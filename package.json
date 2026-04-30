@@ -1,6 +1,6 @@
 {
   "name": "client-rivus-api",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "private": false,
   "description": "Rivus — API de early-access leads + auth admin. Stack próprio do cliente, provisionado via plataforma Artificialis (recipe rivus-api).",
@@ -9,7 +9,8 @@
     "dev": "node --watch src/server.js",
     "migrate": "node src/migrate.js",
     "seed-admin": "node src/seed-admin.js",
-    "test": "node --test tests/**/*.test.mjs"
+    "test": "node --test 'tests/**/*.test.mjs'",
+    "test:unit": "node --test 'tests/unit/**/*.test.mjs'"
   },
   "engines": {
     "node": ">=20"
@@ -22,6 +23,9 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.4.1",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "zod": "^3.23.8"
   }
 }
