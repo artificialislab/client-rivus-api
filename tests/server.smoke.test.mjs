@@ -61,6 +61,7 @@ test('server.js monta os routers corretos + health/ready', () => {
   assert.match(src, /app\.use\('\/api\/admin\/auth', adminAuthRoutes\)/);
   assert.match(src, /app\.use\('\/api\/admin\/leads', adminLeadsRoutes\)/);
   assert.match(src, /app\.use\('\/api\/admin\/audit', adminAuditRoutes\)/);
+  assert.match(src, /app\.use\('\/api\/admin\/stats', adminStatsRoutes\)/);
   assert.match(src, /app\.use\('\/admin\/seed', adminSeedRoutes\)/);
   assert.ok(!src.includes("'/api/admin/seed'"), '/admin/seed deve ficar fora de /api/');
   // Liveness + readiness

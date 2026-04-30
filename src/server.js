@@ -26,6 +26,7 @@ import earlyAccessRoutes from './routes/early-access.js';
 import adminAuthRoutes from './routes/auth.js';
 import adminLeadsRoutes from './routes/admin-leads.js';
 import adminAuditRoutes from './routes/admin-audit.js';
+import adminStatsRoutes from './routes/admin-stats.js';
 import adminSeedRoutes from './routes/admin-seed.js';
 
 const app = express();
@@ -90,6 +91,7 @@ app.use('/api/early-access', earlyAccessRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin/leads', adminLeadsRoutes);
 app.use('/api/admin/audit', adminAuditRoutes);
+app.use('/api/admin/stats', adminStatsRoutes);
 
 // Provisioning interno — fora de /api/ (não exposto pelo Caddy externo)
 app.use('/admin/seed', adminSeedRoutes);
