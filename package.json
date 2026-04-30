@@ -1,6 +1,6 @@
 {
   "name": "client-rivus-api",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "private": false,
   "description": "Rivus — API de early-access leads + auth admin. Stack próprio do cliente, provisionado via plataforma Artificialis (recipe rivus-api).",
