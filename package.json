@@ -9,8 +9,8 @@
     "dev": "node --watch src/server.js",
     "migrate": "node src/migrate.js",
     "seed-admin": "node src/seed-admin.js",
-    "test": "node --test 'tests/**/*.test.mjs'",
-    "test:unit": "node --test 'tests/unit/**/*.test.mjs'"
+    "test": "node --test tests/*.test.mjs tests/unit/*.test.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs"
   },
   "engines": {
     "node": ">=20"
