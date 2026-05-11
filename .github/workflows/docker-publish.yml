@@ -55,3 +55,56 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             RIVUS_API_VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+
+  deploy:
+    name: Deploy rivus-api container
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-client-rivus-api-production
+      cancel-in-progress: true
+
+    steps:
+      - name: Deploy on vps-prod
+        uses: appleboy/ssh-action@v1
+        with:
+          host: '195.200.4.22'
+          username: 'root'
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          envs: GITHUB_SHA
+          script: |
+            set -euo pipefail
+
+            SHORT_SHA="$(printf '%.7s' "$GITHUB_SHA")"
+            IMAGE="ghcr.io/artificialislab/rivus-api:sha-$SHORT_SHA"
+            STACK="/opt/clients/rivus"
+            SERVICE="rivus-api"
+            CONTAINER="rivus-rivus-api"
+
+            [ -f "$STACK/docker-compose.yml" ] || { echo "::error::$STACK/docker-compose.yml not found"; exit 1; }
+
+            cd "$STACK"
+            sed -i "s|image: ghcr.io/artificialislab/rivus-api:[^[:space:]]*|image: $IMAGE|" docker-compose.yml
+            if grep -q 'RIVUS_API_VERSION=' docker-compose.yml; then
+              sed -i "s|- RIVUS_API_VERSION=.*|- RIVUS_API_VERSION=$SHORT_SHA|" docker-compose.yml
+            fi
+            docker compose pull "$SERVICE"
+            docker compose up -d "$SERVICE"
+
+            for attempt in $(seq 1 12); do
+              if docker exec "$CONTAINER" node -e "fetch('http://127.0.0.1:3001/ready').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"; then
+                docker inspect --format '{{.Name}} {{.State.Health.Status}}' "$CONTAINER"
+                docker exec rivus-nginx nginx -s reload || docker restart rivus-nginx
+                exit 0
+              fi
+
+              if [ "$attempt" -eq 12 ]; then
+                docker logs --tail 80 "$CONTAINER" || true
+                exit 1
+              fi
+
+              sleep 5
+            done
