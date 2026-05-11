@@ -87,32 +87,36 @@ export async function listLeads({
   search, status, profile, volumeBand, tags,
   sort = 'newest', cursor, limit = 25, includeDeleted = false,
 }) {
-  const where = [];
-  const params = [];
-  let p = 1;
+  // Filtros base (compartilhados entre listagem e COUNT). Cursor NÃO entra
+  // aqui — é só pra paginação da página atual; o total ignora cursor.
+  const baseWhere = [];
+  const baseParams = [];
+  let pb = 1;
 
-  if (!includeDeleted) where.push('deleted_at IS NULL');
-  if (status && status !== 'all')         { where.push(`status = $${p++}`);      params.push(status); }
-  if (profile && profile !== 'all')       { where.push(`profile = $${p++}`);     params.push(profile); }
-  if (volumeBand && volumeBand !== 'all') { where.push(`volume_band = $${p++}`); params.push(volumeBand); }
-  if (tags && tags.length > 0)            { where.push(`tags && $${p++}`);       params.push(tags); }
+  if (!includeDeleted) baseWhere.push('deleted_at IS NULL');
+  if (status && status !== 'all')         { baseWhere.push(`status = $${pb++}`);      baseParams.push(status); }
+  if (profile && profile !== 'all')       { baseWhere.push(`profile = $${pb++}`);     baseParams.push(profile); }
+  if (volumeBand && volumeBand !== 'all') { baseWhere.push(`volume_band = $${pb++}`); baseParams.push(volumeBand); }
+  if (tags && tags.length > 0)            { baseWhere.push(`tags && $${pb++}`);       baseParams.push(tags); }
   if (search) {
-    where.push(`(LOWER(name) LIKE $${p} OR LOWER(email) LIKE $${p} OR LOWER(company) LIKE $${p})`);
-    params.push(`%${search.toLowerCase()}%`);
-    p++;
+    baseWhere.push(`(LOWER(name) LIKE $${pb} OR LOWER(email) LIKE $${pb} OR LOWER(company) LIKE $${pb})`);
+    baseParams.push(`%${search.toLowerCase()}%`);
+    pb++;
   }
 
-  // Cursor: pula tudo que vem antes do (createdAt, id) do cursor.
-  // Pra sort=newest (DESC), seguir = (created_at, id) menor que cursor.
+  // Cláusula extra do cursor — só usada na query de listagem.
+  const listWhere = [...baseWhere];
+  const listParams = [...baseParams];
+  let pl = pb;
   if (cursor) {
     const decoded = decodeCursor(cursor);
     if (decoded) {
       if (sort === 'oldest') {
-        where.push(`(created_at, id) > ($${p++}, $${p++})`);
+        listWhere.push(`(created_at, id) > ($${pl++}, $${pl++})`);
       } else {
-        where.push(`(created_at, id) < ($${p++}, $${p++})`);
+        listWhere.push(`(created_at, id) < ($${pl++}, $${pl++})`);
       }
-      params.push(decoded.createdAt, decoded.id);
+      listParams.push(decoded.createdAt, decoded.id);
     }
   }
 
@@ -120,7 +124,8 @@ export async function listLeads({
     : sort === 'score' ? 'lead_score DESC, created_at DESC, id DESC'
     : 'created_at DESC, id DESC';
 
-  const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const listWhereSQL = listWhere.length ? `WHERE ${listWhere.join(' AND ')}` : '';
+  const baseWhereSQL = baseWhere.length ? `WHERE ${baseWhere.join(' AND ')}` : '';
 
   // Pega 1 a mais pra detectar se tem próxima página
   const items = await q(
@@ -130,10 +135,10 @@ export async function listLeads({
             assigned_to AS "assignedTo",
             created_at AS "createdAt", updated_at AS "updatedAt",
             deleted_at AS "deletedAt"
-     FROM early_access_leads ${whereSQL}
+     FROM early_access_leads ${listWhereSQL}
      ORDER BY ${orderBy}
      LIMIT ${limit + 1}`,
-    params,
+    listParams,
   );
 
   const hasMore = items.length > limit;
@@ -141,11 +146,10 @@ export async function listLeads({
   const last = slice[slice.length - 1];
   const nextCursor = hasMore && last ? encodeCursor(last.createdAt, last.id) : null;
 
-  // Total (sem paginação) — útil pro contador da UI. Query separada pra
-  // não complicar a paginação.
+  // Total (sem paginação nem cursor) — útil pro contador da UI.
   const totalRow = await one(
-    `SELECT COUNT(*)::int AS c FROM early_access_leads ${whereSQL}`,
-    params.slice(0, where.length - (cursor ? 2 : 0)),  // remove os 2 params do cursor
+    `SELECT COUNT(*)::int AS c FROM early_access_leads ${baseWhereSQL}`,
+    baseParams,
   );
 
   return { items: slice, nextCursor, total: totalRow?.c || 0 };

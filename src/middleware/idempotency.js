@@ -40,10 +40,15 @@ export function idempotencyMiddleware(endpointLabel) {
     res.json = (body) => {
       // Status pode não ter sido setado ainda — defaultJa pra 200
       const status = res.statusCode || 200;
-      // Best-effort gravar (não bloqueia response)
-      idempotencyRepo.record(key, endpointLabel, status, body).catch((err) => {
-        logger.warn({ err: err.message, key, endpoint: endpointLabel }, 'idempotency_record_failed');
-      });
+      // Só cacheia respostas determinísticas (2xx). Erros 4xx podem
+      // depender de estado mutável (rate-limit, lock) e 5xx são
+      // transientes — replayar erro caché prenderia o cliente em loop.
+      if (status >= 200 && status < 300) {
+        // Best-effort gravar (não bloqueia response)
+        idempotencyRepo.record(key, endpointLabel, status, body).catch((err) => {
+          logger.warn({ err: err.message, key, endpoint: endpointLabel }, 'idempotency_record_failed');
+        });
+      }
       return originalJson(body);
     };
 
