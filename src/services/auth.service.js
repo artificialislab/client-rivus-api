@@ -80,7 +80,13 @@ export async function login({ email, password }, ctx = {}) {
 
   // Caso 4: sucesso — reset failed + audit + JWT
   await adminsRepo.recordSuccessfulLogin(user.id);
-  const userPayload = { id: user.id, email: user.email, name: user.name, role: user.role };
+  // Inclui sub (claim canônico do JWT) ALÉM de id pra alinhar com GET /me
+  // (que retorna { sub, ... }). Sem isso, o cliente que valida user pelo sub
+  // falha a sessão recém-criada — login ok no backend, mas front mostra erro.
+  const userPayload = {
+    sub: user.id, id: user.id,
+    email: user.email, name: user.name, role: user.role,
+  };
   const token = signToken(userPayload);
   audit.record({
     requestId: ctx.requestId,
