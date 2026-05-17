@@ -1,6 +1,6 @@
 # Regras Do Projeto Para Agentes
 
-Antes de trabalhar neste repositorio, siga tambem as regras operacionais do repo `andre-ops`.
+Antes de trabalhar neste repositorio, siga tambem as regras operacionais do repo `lab-ops`.
 
 ## Fluxo obrigatorio
 
