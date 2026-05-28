@@ -32,7 +32,23 @@ import adminSeedRoutes from './routes/admin-seed.js';
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 
-app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+// Trust proxy: o setup canônico do rivus-api é Caddy → rivus-api num bridge
+// network do compose, então o request chega no Express vindo do IP do Caddy
+// (não 127.0.0.1). 'loopback' (default antigo) zera o rate-limit e o IP dos
+// leads nesse cenário. Confiar em 1 hop por padrão pra que req.ip reflita o
+// IP real do cliente (X-Forwarded-For setado pelo Caddy) e o rate limiter não
+// colapse todo o tráfego numa única bucket. Cliente pode override via
+// TRUST_PROXY env (ex: 'loopback', 'true', '2', etc). Mesmo padrão do core-blog-api.
+const _trustProxy = process.env.TRUST_PROXY;
+if (_trustProxy === undefined || _trustProxy === '') {
+  app.set('trust proxy', 1);
+} else if (_trustProxy === 'true' || _trustProxy === 'false') {
+  app.set('trust proxy', _trustProxy === 'true');
+} else if (/^\d+$/.test(_trustProxy)) {
+  app.set('trust proxy', Number(_trustProxy));
+} else {
+  app.set('trust proxy', _trustProxy);
+}
 app.disable('x-powered-by');
 
 // Request ID antes de TUDO pra logs sempre terem.
