@@ -54,7 +54,12 @@ router.get('/export.csv', validateQuery(LeadsListQuerySchema), asyncHandler(asyn
                    'nome', 'email', 'empresa', 'telefone', 'origem', 'nota', 'tags',
                    'utm_source', 'utm_medium', 'utm_campaign', 'referrer'];
   const escape = (v) => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // Anti formula-injection (OWASP CSV injection): células que começam com
+    // = + - @ tab ou CR viram fórmula no Excel/Sheets/LibreOffice. Como
+    // name/email/company/note vêm do formulário público, prefixa apóstrofo
+    // pra neutralizar (Excel trata como texto literal).
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.join(',')];
