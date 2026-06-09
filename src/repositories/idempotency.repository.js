@@ -37,7 +37,10 @@ export async function record(key, endpoint, status, body) {
   );
 }
 
-/** Cleanup lazy — chamado de tempos em tempos pela seed/migrate. */
+/**
+ * GC de keys expiradas. Chamado ao final do migrate.js, que roda a cada
+ * boot do container (CMD do Dockerfile) — nao ha scheduler dedicado.
+ */
 export async function cleanupExpired() {
   return one(
     `DELETE FROM idempotency_keys WHERE expires_at < NOW() RETURNING 1`,

@@ -11,6 +11,7 @@
  */
 import { Router } from 'express';
 import crypto from 'node:crypto';
+import { SeedAdminSchema } from '../schemas/auth.js';
 import { one } from '../db.js';
 import { hashPassword } from '../auth.js';
 import { asyncHandler } from '../http.js';
@@ -43,13 +44,15 @@ router.post('/', seedRateLimit, asyncHandler(async (req, res) => {
     return res.status(401).json({ error: 'invalid_seed_token' });
   }
 
-  const { email, name } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // SeedAdminSchema ja normaliza (trim + lowercase) e valida o email;
+  // mesmo contrato de antes: payload invalido -> 400 invalid_email.
+  const parsed = SeedAdminSchema.safeParse(req.body || {});
+  if (!parsed.success) {
     return res.status(400).json({ error: 'invalid_email' });
   }
 
-  const normalizedEmail = String(email).trim().toLowerCase();
-  const displayName = String(name || '').trim() || normalizedEmail.split('@')[0];
+  const normalizedEmail = parsed.data.email;
+  const displayName = (parsed.data.name || '') || normalizedEmail.split('@')[0];
 
   const existing = await one(
     `SELECT id, email, created_at FROM admin_users WHERE LOWER(email) = $1 LIMIT 1`,
