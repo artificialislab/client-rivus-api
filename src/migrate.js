@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from './db.js';
+import { cleanupExpired } from './repositories/idempotency.repository.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_DIR = path.resolve(__dirname, '..', 'db');
@@ -29,6 +30,9 @@ async function run() {
     await pool.query(sql);
   }
 
+  // GC de idempotency keys expiradas (TTL 24h). O migrate roda a cada boot
+  // do container (CMD do Dockerfile), entao este e o ponto natural do cleanup.
+  await cleanupExpired();
   // eslint-disable-next-line no-console
   console.log('[migrate] OK');
   await pool.end();
