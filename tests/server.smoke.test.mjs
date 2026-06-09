@@ -52,7 +52,11 @@ test('Dockerfile: Node 20 alpine, migrate antes do server, healthcheck', () => {
 test('CI workflow publica em ghcr.io/artificialislab/rivus-api', () => {
   const yml = read('.github/workflows/docker-publish.yml');
   assert.match(yml, /IMAGE_NAME: artificialislab\/rivus-api/);
-  assert.match(yml, /tags: \['v\*\.\*\.\*'\]/);
+  // Trigger atual: workflow_dispatch (actions automáticas pausadas em
+  // db1bc71 "ci: pause automatic actions"). Versionamento via semver no
+  // metadata-action.
+  assert.match(yml, /workflow_dispatch:/);
+  assert.match(yml, /type=semver,pattern=\{\{version\}\}/);
 });
 
 test('server.js monta os routers corretos + health/ready', () => {

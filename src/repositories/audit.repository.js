@@ -24,12 +24,18 @@ function encodeCursor(createdAt, id) {
   return Buffer.from(`${new Date(createdAt).toISOString()}|${id}`).toString('base64url');
 }
 
+const CURSOR_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function decodeCursor(cursor) {
   try {
     const decoded = Buffer.from(cursor, 'base64url').toString('utf8');
     const [iso, id] = decoded.split('|');
     if (!iso || !id) return null;
-    return { createdAt: new Date(iso), id };
+    // Valida data + uuid — cursor malformado (user-supplied) virava
+    // "Invalid Date"/uuid inválido no bind do pg e estourava 500.
+    const createdAt = new Date(iso);
+    if (Number.isNaN(createdAt.getTime()) || !CURSOR_UUID_RE.test(id)) return null;
+    return { createdAt, id };
   } catch { return null; }
 }
 
