@@ -61,16 +61,27 @@ export async function recordSuccessfulLogin(id) {
  * Incrementa failed_attempts. Após `lockoutThreshold` falhas, seta
  * locked_until = NOW() + lockoutDuration. Idempotente em re-tentativas.
  *
+ * Se o lockout anterior já EXPIROU, a contagem recomeça em 1 (a janela de
+ * lockout perdoa as falhas passadas). Sem isso, uma conta que já travou uma
+ * vez re-travava com uma única senha errada (failed_attempts ficava em N).
+ *
  * Retorna { failedAttempts, lockedUntil }.
  */
 export async function recordFailedLogin(id, { lockoutThreshold = 5, lockoutMinutes = 15 } = {}) {
   return one(
     `UPDATE admin_users
-        SET failed_attempts = failed_attempts + 1,
+        SET failed_attempts = CASE
+              WHEN locked_until IS NOT NULL AND locked_until <= NOW() THEN 1
+              ELSE failed_attempts + 1
+            END,
             last_failed_at = NOW(),
             locked_until = CASE
+              WHEN locked_until IS NOT NULL AND locked_until <= NOW()
+                THEN CASE WHEN 1 >= $2
+                          THEN NOW() + ($3 || ' minutes')::INTERVAL
+                          ELSE NULL END
               WHEN failed_attempts + 1 >= $2
-              THEN NOW() + ($3 || ' minutes')::INTERVAL
+                THEN NOW() + ($3 || ' minutes')::INTERVAL
               ELSE locked_until
             END
       WHERE id = $1
