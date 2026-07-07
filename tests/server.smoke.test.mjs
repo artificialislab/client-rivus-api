@@ -40,6 +40,12 @@ test('db migrations: 001_init + 002_robustness', () => {
   // Lockout em admin_users
   assert.match(robust, /failed_attempts/);
   assert.match(robust, /locked_until/);
+
+  // 003: claim-first idempotency — response vira nullable (claim antes
+  // de processar, response gravada depois)
+  const claim = read('db/003_idempotency_claim.sql');
+  assert.match(claim, /ALTER TABLE idempotency_keys ALTER COLUMN response_status DROP NOT NULL/);
+  assert.match(claim, /ALTER TABLE idempotency_keys ALTER COLUMN response_body\s+DROP NOT NULL/);
 });
 
 test('Dockerfile: Node 20 alpine, migrate antes do server, healthcheck', () => {
