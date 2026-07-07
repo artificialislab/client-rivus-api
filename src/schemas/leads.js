@@ -43,7 +43,12 @@ export const LeadsListQuerySchema = z.object({
   cursor:     z.string().optional(),
   limit:      z.coerce.number().int().min(5).max(100).optional().default(25),
   // Inclui soft-deleted? Default false.
-  includeDeleted: z.coerce.boolean().optional().default(false),
+  // NAO usar z.coerce.boolean(): Boolean('false') === true — qualquer string
+  // nao vazia coeria pra true e ?includeDeleted=false vazava leads deletados.
+  includeDeleted: z.preprocess(
+    (v) => v === true || v === 'true' || v === '1',
+    z.boolean(),
+  ).default(false),
 });
 
 // ─── PATCH /api/admin/leads/:id ───────────────────────────────────────────

@@ -100,3 +100,31 @@ test('Constantes exportadas batem com o front Lovable', () => {
   assert.deepEqual(VOLUME_BANDS, ['lt_500k', '500k_2m', '2m_10m', '10m_50m', 'gt_50m']);
   assert.deepEqual(LEAD_STATUSES, ['new', 'contacted', 'qualified', 'rejected', 'converted']);
 });
+
+// ─── Regressao: includeDeleted nao pode usar z.coerce.boolean ────────────
+// Boolean('false') === true; ?includeDeleted=false vazava soft-deleted.
+test('LeadsListQuerySchema: includeDeleted="false" vira false', () => {
+  const r = LeadsListQuerySchema.safeParse({ includeDeleted: 'false' });
+  assert.ok(r.success);
+  assert.equal(r.data.includeDeleted, false);
+});
+
+test('LeadsListQuerySchema: includeDeleted="0" vira false', () => {
+  const r = LeadsListQuerySchema.safeParse({ includeDeleted: '0' });
+  assert.ok(r.success);
+  assert.equal(r.data.includeDeleted, false);
+});
+
+test('LeadsListQuerySchema: includeDeleted="true"/"1" viram true', () => {
+  for (const v of ['true', '1']) {
+    const r = LeadsListQuerySchema.safeParse({ includeDeleted: v });
+    assert.ok(r.success);
+    assert.equal(r.data.includeDeleted, true, v);
+  }
+});
+
+test('LeadsListQuerySchema: includeDeleted ausente defaulta false', () => {
+  const r = LeadsListQuerySchema.safeParse({});
+  assert.ok(r.success);
+  assert.equal(r.data.includeDeleted, false);
+});

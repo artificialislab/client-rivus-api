@@ -4,25 +4,45 @@
  * Acesso DB puro. Sem lógica de negócio (essa fica no service).
  * Todas as queries respeitam soft-delete por default (filtro `deleted_at IS NULL`).
  *
- * Cursor pagination: encoded base64 de "<iso>|<uuid>". Decodificado vira
- * WHERE (created_at, id) < (cursor.created_at, cursor.id) — comparação
- * lexicográfica estável.
+ * Cursor pagination: encoded base64. Formato depende do sort:
+ *   newest/oldest -> "<iso>|<uuid>"          -> WHERE (created_at, id) </> (...)
+ *   score         -> "<score>|<iso>|<uuid>"  -> WHERE (lead_score, created_at, id) < (...)
+ * O keyset sempre espelha o ORDER BY do sort correspondente.
  */
 import { q, one, pool } from '../db.js';
 
-function encodeCursor(createdAt, id) {
-  return Buffer.from(`${new Date(createdAt).toISOString()}|${id}`).toString('base64url');
+// Cursor precisa espelhar o ORDER BY do sort. Pra 'score' o keyset e
+// (lead_score, created_at, id); pros demais, (created_at, id). Cursor que
+// nao casa com o formato do sort e ignorado (volta pra pagina 1) — seguro
+// porque o cursor e opaco e regenerado a cada resposta.
+function encodeCursor(row, sort) {
+  const iso = new Date(row.createdAt).toISOString();
+  const raw = sort === 'score'
+    ? `${row.leadScore}|${iso}|${row.id}`
+    : `${iso}|${row.id}`;
+  return Buffer.from(raw).toString('base64url');
 }
 
 const CURSOR_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function decodeCursor(cursor) {
+function decodeCursor(cursor, sort = 'newest') {
   try {
     const decoded = Buffer.from(cursor, 'base64url').toString('utf8');
-    const [iso, id] = decoded.split('|');
-    if (!iso || !id) return null;
+    const parts = decoded.split('|');
     // Valida data + uuid — cursor malformado (user-supplied) virava
     // "Invalid Date"/uuid inválido no bind do pg e estourava 500.
+    if (sort === 'score') {
+      if (parts.length !== 3) return null;
+      const [scoreStr, iso, id] = parts;
+      const leadScore = Number(scoreStr);
+      const createdAt = new Date(iso);
+      if (!Number.isInteger(leadScore)) return null;
+      if (Number.isNaN(createdAt.getTime()) || !CURSOR_UUID_RE.test(id)) return null;
+      return { leadScore, createdAt, id };
+    }
+    if (parts.length !== 2) return null;
+    const [iso, id] = parts;
+    if (!iso || !id) return null;
     const createdAt = new Date(iso);
     if (Number.isNaN(createdAt.getTime()) || !CURSOR_UUID_RE.test(id)) return null;
     return { createdAt, id };
@@ -115,14 +135,21 @@ export async function listLeads({
   const listParams = [...baseParams];
   let pl = pb;
   if (cursor) {
-    const decoded = decodeCursor(cursor);
+    const decoded = decodeCursor(cursor, sort);
     if (decoded) {
-      if (sort === 'oldest') {
+      if (sort === 'score') {
+        // Keyset composto casando com ORDER BY lead_score DESC, created_at DESC, id DESC.
+        // Antes o cursor so carregava (created_at, id) e o filtro por data
+        // duplicava/pulava rows nas paginas seguintes do sort=score.
+        listWhere.push(`(lead_score, created_at, id) < ($${pl++}, $${pl++}, $${pl++})`);
+        listParams.push(decoded.leadScore, decoded.createdAt, decoded.id);
+      } else if (sort === 'oldest') {
         listWhere.push(`(created_at, id) > ($${pl++}, $${pl++})`);
+        listParams.push(decoded.createdAt, decoded.id);
       } else {
         listWhere.push(`(created_at, id) < ($${pl++}, $${pl++})`);
+        listParams.push(decoded.createdAt, decoded.id);
       }
-      listParams.push(decoded.createdAt, decoded.id);
     }
   }
 
@@ -150,7 +177,7 @@ export async function listLeads({
   const hasMore = items.length > limit;
   const slice = hasMore ? items.slice(0, limit) : items;
   const last = slice[slice.length - 1];
-  const nextCursor = hasMore && last ? encodeCursor(last.createdAt, last.id) : null;
+  const nextCursor = hasMore && last ? encodeCursor(last, sort) : null;
 
   // Total (sem paginação nem cursor) — útil pro contador da UI.
   const totalRow = await one(
