@@ -21,14 +21,16 @@
 # Variáveis opcionais (export antes do comando):
 #   ADMIN_EMAIL     — email do admin a criar (default: contato@rivus.trading)
 #   ADMIN_PASSWORD  — senha do admin (default: gerada aleatória, mostrada no fim)
-#   RIVUS_API_TAG   — tag da imagem Docker (default: 1.1.0)
+#   RIVUS_API_TAG   — tag da imagem Docker (default: 1.1.2)
 # ============================================================================
 
 set -euo pipefail
 
 CLIENT_DIR="/opt/clients/rivus"
 PREFIX="rivus"
-RIVUS_API_TAG="${RIVUS_API_TAG:-1.1.0}"
+# Manter em sync com a "version" do package.json (script roda na VPS via
+# curl, sem acesso ao package.json do repo).
+RIVUS_API_TAG="${RIVUS_API_TAG:-1.1.2}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-contato@rivus.trading}"
 # Senha forte aleatória se não passada (24 chars base64url)
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 24 | tr '+/' '-_' | head -c 24)}"

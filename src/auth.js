@@ -12,7 +12,14 @@ import { one } from './db.js';
 
 const JWT_SECRET = process.env.RIVUS_JWT_SECRET || process.env.JWT_SECRET;
 const COOKIE_NAME = process.env.COOKIE_NAME || 'rivus_admin_session';
-const TOKEN_TTL = process.env.TOKEN_TTL || '30d';
+// TOKEN_TTL aceita '30d', '12h' ou segundos puros ('3600'). String numérica
+// vira Number: o jsonwebtoken interpreta number como SEGUNDOS, mas string
+// '3600' como 3600ms (vercel/ms) — o que expiraria o token em 3.6s e
+// deixaria o cookie com 30d. (Correção portada do core-blog-api.)
+const TOKEN_TTL_RAW = process.env.TOKEN_TTL || '30d';
+const TOKEN_TTL = /^\d+$/.test(String(TOKEN_TTL_RAW).trim())
+  ? Number(String(TOKEN_TTL_RAW).trim())
+  : TOKEN_TTL_RAW;
 const COOKIE_SECURE = process.env.COOKIE_SECURE
   ? process.env.COOKIE_SECURE === 'true'
   : process.env.NODE_ENV === 'production';
@@ -64,6 +71,19 @@ export function verifyToken(token) {
   }
 }
 
+// Deriva o maxAge do cookie (ms) a partir do TOKEN_TTL, pra JWT e cookie
+// expirarem juntos. Portado do core-blog-api.
+function tokenTtlToCookieMaxAge(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value * 1000;
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d+)\s*(s|m|h|d)$/i);
+  if (!match) return 30 * 24 * 60 * 60 * 1000;
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return amount * multipliers[unit];
+}
+
 /**
  * Middleware Express — extrai JWT do cookie OU Authorization Bearer,
  * valida, carrega req.user. Rejeita 401 se inválido.
@@ -110,7 +130,7 @@ export function setSessionCookie(res, token) {
     httpOnly: true,
     secure: COOKIE_SECURE,
     sameSite: 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge: tokenTtlToCookieMaxAge(TOKEN_TTL),
     path: '/',
   });
 }
