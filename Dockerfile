@@ -1,10 +1,10 @@
 # ============================================================================
 # Rivus API — imagem Docker provisionada via plataforma Artificialis.
 #
-# Padrão idêntico ao core-blog-api: Node 20 alpine, production only,
+# Padrão idêntico ao core-blog-api: Node 22 alpine, production only,
 # migrations idempotentes no startup. Customizável só nas env vars.
 # ============================================================================
-FROM node:20-alpine
+FROM node:22-alpine
 
 ARG RIVUS_API_VERSION=dev
 
