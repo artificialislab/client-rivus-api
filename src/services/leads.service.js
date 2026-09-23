@@ -83,7 +83,17 @@ export async function patchLead(id, patch, ctx = {}) {
   const before = await leadsRepo.getLeadById(id);
   if (!before) throw new ServiceError('lead não encontrado', { status: 404, code: 'lead_not_found' });
 
-  const updated = await leadsRepo.updateLead(id, patch, { actorId: ctx.actorId });
+  let updated;
+  try {
+    updated = await leadsRepo.updateLead(id, patch, { actorId: ctx.actorId });
+  } catch (err) {
+    // 23503 = foreign_key_violation (assignedTo aponta pra admin inexistente).
+    // Erro do cliente, não 500.
+    if (err.code === '23503') {
+      throw new ServiceError('assignedTo não corresponde a um admin existente', { status: 400, code: 'invalid_assignee' });
+    }
+    throw err;
+  }
   if (!updated) {
     // race: alguém deletou enquanto patcheávamos
     throw new ServiceError('lead já foi deletado', { status: 410, code: 'lead_gone' });

@@ -37,8 +37,13 @@ async function main() {
   );
 
   if (existing) {
+    // Reset de senha também destrava a conta: sem zerar o lockout, o admin
+    // que acabou de resetar continuava recebendo 423 account_locked.
     await one(
-      `UPDATE admin_users SET password_hash = $1, name = COALESCE($2, name) WHERE id = $3 RETURNING id, email`,
+      `UPDATE admin_users
+          SET password_hash = $1, name = COALESCE($2, name),
+              failed_attempts = 0, locked_until = NULL
+        WHERE id = $3 RETURNING id, email`,
       [hash, name, existing.id],
     );
     // eslint-disable-next-line no-console
