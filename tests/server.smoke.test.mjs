@@ -12,10 +12,10 @@ const ROOT = path.resolve(__dirname, '..');
 
 function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
 
-test('package.json declara deps + Node >=20', () => {
+test('package.json declara deps + Node >=22.12', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.type, 'module');
-  assert.ok(pkg.engines.node.includes('20'));
+  assert.ok(pkg.engines.node.includes('22.12'));
   for (const dep of ['express', 'pg', 'bcryptjs', 'jsonwebtoken', 'cookie-parser', 'cors',
                      'express-rate-limit', 'dotenv', 'zod', 'pino']) {
     assert.ok(pkg.dependencies[dep], `dep ausente: ${dep}`);
@@ -48,9 +48,9 @@ test('db migrations: 001_init + 002_robustness', () => {
   assert.match(claim, /ALTER TABLE idempotency_keys ALTER COLUMN response_body\s+DROP NOT NULL/);
 });
 
-test('Dockerfile: Node 20 alpine, migrate antes do server, healthcheck', () => {
+test('Dockerfile: Node 22 alpine, migrate antes do server, healthcheck', () => {
   const docker = read('Dockerfile');
-  assert.match(docker, /FROM node:20-alpine/);
+  assert.match(docker, /FROM node:22-alpine/);
   assert.match(docker, /node src\/migrate\.js && node src\/server\.js/);
   assert.match(docker, /HEALTHCHECK/);
 });
